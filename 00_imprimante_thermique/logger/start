@@ -1,0 +1,1 @@
+./.venv/bin/python ./mqtt_logger.py --broker test.mosquitto.org --topic jmssf/print --file ./log.txt
