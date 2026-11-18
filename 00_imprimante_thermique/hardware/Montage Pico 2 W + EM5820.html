@@ -1,0 +1,465 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Montage Pico 2 W + EM5820</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout : vue 3D à gauche (l'établi), fiche de câblage à droite ; une seule colonne sur téléphone */
+:root {
+  --bg: #f3f5f2;
+  --panel: #ffffff;
+  --fg: #1b211d;
+  --muted: #5d6a62;
+  --line: #d6ddd7;
+  --stage: #e4e9e3;
+  --accent: #1f7a4d;          /* vert PCB */
+  --danger: #c62828;
+  --danger-bg: #fdecea;
+  --chip-bg: rgba(255,255,255,.92);
+  --chip-fg: #1b211d;
+  --f-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121614; --panel: #1a201d; --fg: #e6ece8; --muted: #9aa8a0; --line: #2c3530;
+    --stage: #1e2522; --accent: #4cc38a; --danger: #ff6b6b; --danger-bg: #3a1d1d;
+    --chip-bg: rgba(20,26,23,.9); --chip-fg: #e6ece8; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121614; --panel: #1a201d; --fg: #e6ece8; --muted: #9aa8a0; --line: #2c3530;
+  --stage: #1e2522; --accent: #4cc38a; --danger: #ff6b6b; --danger-bg: #3a1d1d;
+  --chip-bg: rgba(20,26,23,.9); --chip-fg: #e6ece8; color-scheme: dark;
+}
+
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--f-body); line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 32px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 16px; }
+header h1 { font-family: var(--f-display); font-size: clamp(1.4rem, 3vw, 2rem); margin: 0; text-wrap: balance; }
+header p { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+
+.warn {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: var(--danger-bg); color: var(--danger);
+  border: 1px solid var(--danger); border-radius: 10px; padding: 10px 14px; font-weight: 600;
+}
+.warn b { font-family: var(--f-display); letter-spacing: .02em; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+.stage-wrap { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--stage); }
+#stage { width: 100%; height: clamp(380px, 62vh, 640px); display: block; touch-action: none; }
+#labels { position: absolute; inset: 0; pointer-events: none; }
+.lbl {
+  position: absolute; transform: translate(-50%, -100%); white-space: nowrap;
+  background: var(--chip-bg); color: var(--chip-fg);
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 2px 7px; font: 500 12px/1.4 var(--f-body);
+  display: flex; align-items: center; gap: 6px;
+  transition: opacity .2s;
+}
+.lbl .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.lbl.mono { font-family: var(--f-mono); font-size: 11.5px; }
+.lbl.danger { color: #fff; background: #c62828; border-color: #c62828; font-weight: 700; }
+.lbl.dim { opacity: .25; }
+
+.toolbar { position: absolute; left: 10px; right: 10px; top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.toolbar.bottom { top: auto; bottom: 10px; justify-content: flex-end; }
+button {
+  font: 600 13px/1 var(--f-body); color: var(--fg); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; cursor: pointer;
+}
+button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { position: absolute; left: 12px; bottom: 12px; font-size: 12px; color: var(--muted); }
+
+aside { display: grid; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.card h2 { font-family: var(--f-display); font-size: 1.05rem; margin: 0 0 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+td, th { padding: 7px 4px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-top: none; }
+td.m { font-family: var(--f-mono); font-size: 12.5px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; border: 1px solid rgba(0,0,0,.2); }
+.opt { color: var(--muted); }
+ol, ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+.small { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; }
+@media (prefers-reduced-motion: reduce) { .lbl { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Montage Pico 2 W + imprimante EM5820</h1>
+    <p>Schéma 3D à faire tourner : clique-glisse pour pivoter, molette ou pincement pour zoomer. Les boutons isolent chaque étape du câblage.</p>
+  </header>
+
+  <div class="warn" role="alert">
+    <span aria-hidden="true">⚠</span>
+    <span><b>Ne jamais brancher le connecteur RS232</b> sur la Pico : il envoie environ ±12 V et grille la carte. Utilise uniquement le connecteur <b>TTL</b>.</span>
+  </div>
+
+  <div class="grid">
+    <div class="stage-wrap">
+      <canvas id="stage" aria-label="Schéma 3D du montage Pico 2 W et imprimante"></canvas>
+      <div id="labels"></div>
+      <div class="toolbar" role="group" aria-label="Étapes">
+        <button id="s-all" aria-pressed="true">Tout</button>
+        <button id="s-power" aria-pressed="false">1 · Alim imprimante</button>
+        <button id="s-data" aria-pressed="false">2 · Données TTL</button>
+        <button id="s-usb" aria-pressed="false">3 · USB Pico</button>
+      </div>
+      <div class="toolbar bottom" role="group" aria-label="Vue">
+        <button id="v-3d">Vue 3D</button>
+        <button id="v-top">Dessus</button>
+        <button id="v-front">Face</button>
+        <button id="v-pico">Zoom Pico</button>
+        <button id="v-under">Dessous</button>
+        <button id="opt" aria-pressed="true">Fil GP1 optionnel</button>
+      </div>
+    </div>
+
+    <aside>
+      <div class="card">
+        <h2>Les connexions</h2>
+        <table>
+          <thead><tr><th>Fil</th><th>Pico 2 W</th><th>Imprimante</th></tr></thead>
+          <tbody>
+            <tr><td><span class="sw" style="background:#2e9e4f"></span>Vert</td><td class="m">GP0 · broche 1</td><td class="m">RX (TTL)</td></tr>
+            <tr><td><span class="sw" style="background:#222"></span>Noir</td><td class="m">GND · broche 3</td><td class="m">GND (TTL)</td></tr>
+            <tr class="opt"><td><span class="sw" style="background:#e3b505"></span>Jaune</td><td class="m">GP1 · broche 2</td><td class="m">TX (TTL)<br>optionnel*</td></tr>
+            <tr><td><span class="sw" style="background:#d32f2f"></span>Rouge</td><td>Adaptateur +</td><td class="m">VH / VCC</td></tr>
+            <tr><td><span class="sw" style="background:#222"></span>Noir</td><td>Adaptateur −</td><td class="m">GND (ALIM)</td></tr>
+            <tr><td><span class="sw" style="background:#8a8f8c"></span>Gris</td><td class="m">USB</td><td>PC ou chargeur 5 V</td></tr>
+          </tbody>
+        </table>
+        <p class="small">* Le code ne lit rien venant de l'imprimante : ce fil peut rester débranché. Si tu le branches et que l'imprimante sort du 5 V, ajoute un pont diviseur (1 kΩ + 2 kΩ).</p>
+      </div>
+
+      <div class="card">
+        <h2>De quel côté sur la Pico ?</h2>
+        <p style="margin:0 0 8px;font-size:14px">Le code utilise <span class="m">UART(0, tx=Pin(0), rx=Pin(1))</span> : il faut donc <b>GP0 (broche 1)</b>, <b>GP1 (broche 2)</b> et <b>GND (broche 3)</b>. Ce sont les trois premières broches, du côté du port USB. Le côté où elles se trouvent dépend de la façon dont tu tiens la carte :</p>
+        <table>
+          <thead><tr><th>Tu regardes…</th><th>USB</th><th>Broches 1-2-3</th></tr></thead>
+          <tbody>
+            <tr><td>le dessus (puce visible)</td><td>en haut</td><td><b>en haut à gauche</b></td></tr>
+            <tr><td>le dessous (broches mâles vers toi)</td><td>en haut</td><td><b>en haut à droite</b></td></tr>
+          </tbody>
+        </table>
+        <p class="small">Comme tes fils femelles se branchent par-dessous, tu vois souvent la carte retournée : les broches 1-2-3 apparaissent alors <b>à droite</b>. Les noms <span class="m">GP0</span>, <span class="m">GP1</span>, <span class="m">GND</span> sont imprimés sous la carte : fie-toi à eux. Le bouton « Dessous » montre cette vue.</p>
+      </div>
+
+      <div class="card">
+        <h2>Ordre de branchement</h2>
+        <ol>
+          <li>Tout est <b>débranché</b> : adaptateur hors prise, Pico sans USB.</li>
+          <li>Fils de données, en enfichant les connecteurs femelles sur les broches mâles <b>sous</b> la Pico : GP0 → RX, GND → GND (connecteur TTL).</li>
+          <li>Adaptateur 5–9 V ≥ 2 A : + sur VH, − sur GND (connecteur ALIM).</li>
+          <li>Vérifie chaque fil du doigt, puis branche l'adaptateur.</li>
+          <li>Branche la Pico en USB (PC ou chargeur).</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>À vérifier sur ta carte</h2>
+        <ul>
+          <li>Les couleurs du câble JST de l'imprimante ne sont pas standard : lis les inscriptions (<span class="m">GND</span>, <span class="m">RXD</span>, <span class="m">TXD</span>, <span class="m">VH</span>) à côté de chaque prise.</li>
+          <li>La broche 1 de la Pico est celle marquée d'un petit carré, côté USB.</li>
+        </ul>
+        <p class="small">Schéma non à l'échelle : la Pico est agrandie pour que les broches restent lisibles.</p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function () {
+  const canvas = document.getElementById('stage');
+  const labelLayer = document.getElementById('labels');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (!window.THREE) {
+    labelLayer.innerHTML = '<div style="padding:16px">La vue 3D n\'a pas pu se charger. Le tableau des connexions à droite reste valable.</div>';
+    return;
+  }
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 500);
+  const controls = new THREE.OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.maxPolarAngle = Math.PI * 0.97;
+  controls.minDistance = 8;
+  controls.maxDistance = 80;
+
+  // ---------- Thème ----------
+  function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  let deskMat, gridHelper;
+  function applyTheme() {
+    const stage = new THREE.Color(cssVar('--stage') || '#e4e9e3');
+    scene.background = stage;
+    if (deskMat) deskMat.color = stage.clone().offsetHSL(0, 0, -0.03);
+  }
+
+  // ---------- Lumières ----------
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x445544, 0.85));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.75);
+  sun.position.set(10, 20, 14);
+  scene.add(sun);
+
+  // ---------- Matériaux ----------
+  const M = (color, extra) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.6, metalness: 0.05 }, extra || {}));
+  const box = (w, h, d, mat, x, y, z, parent) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z); (parent || scene).add(m); return m;
+  };
+
+  // ---------- Bureau ----------
+  deskMat = M(0xdddddd, { roughness: 0.9 });
+  const desk = new THREE.Mesh(new THREE.PlaneGeometry(80, 60), deskMat);
+  desk.rotation.x = -Math.PI / 2; scene.add(desk);
+  gridHelper = new THREE.GridHelper(60, 30, 0x889988, 0x889988);
+  gridHelper.material.transparent = true; gridHelper.material.opacity = 0.12;
+  gridHelper.position.y = 0.01; scene.add(gridHelper);
+  applyTheme();
+
+  // ---------- Pico 2 W (agrandie x2) ----------
+  const pico = { cx: 0, cz: 6, L: 10.2, W: 4.2, y: 2.4 };
+  box(pico.W, 0.16, pico.L, M(0x1f7a4d), pico.cx, pico.y, pico.cz);                    // PCB
+  box(1.4, 0.18, 1.4, M(0x1a1a1a), 0, pico.y + 0.17, pico.cz - 0.4);                     // RP2350
+  box(2.4, 0.3, 2.6, M(0xb8bcc0, { metalness: 0.6, roughness: 0.3 }), 0, pico.y + 0.23, pico.cz + 3.2); // module Wi-Fi
+  box(1.6, 0.6, 1.1, M(0xc9cdd1, { metalness: 0.7, roughness: 0.3 }), 0, pico.y + 0.38, pico.cz - pico.L / 2 + 0.3); // USB
+  box(0.5, 0.25, 0.4, M(0xf2f2f2), -0.9, pico.y + 0.2, pico.cz - 2.4);                   // BOOTSEL
+  // Barrettes et broches
+  const pinZ = i => pico.cz - pico.L / 2 + 0.826 + (i - 1) * 0.508;
+  const rowX = 1.778;
+  const pinPos = {};
+  const gold = M(0xd4a640, { metalness: 0.8, roughness: 0.3 });
+  const special = { 1: 0x2e9e4f, 2: 0xe3b505, 3: 0x444444 };
+  for (let i = 1; i <= 20; i++) {
+    const zL = pinZ(i);
+    [[-rowX, i], [rowX, 41 - i]].forEach(([x, n]) => {
+      const mat = special[n] ? M(special[n], { emissive: special[n], emissiveIntensity: 0.35 }) : gold;
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.06, 16), mat);
+      pad.position.set(x, pico.y + 0.1, zL); scene.add(pad);
+      // broche mâle qui sort SOUS la carte
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.5, 0.12), gold);
+      leg.position.set(x, pico.y - 0.95, zL); scene.add(leg);
+      if (special[n]) {
+        // connecteur femelle Dupont enfiché par-dessous
+        const housing = new THREE.Mesh(new THREE.BoxGeometry(0.46, 1.1, 0.46), M(0x111111));
+        housing.position.set(x, pico.y - 1.55, zL); scene.add(housing);
+        const band = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.18, 0.48), M(special[n], { emissive: special[n], emissiveIntensity: 0.3 }));
+        band.position.set(x, pico.y - 1.95, zL); scene.add(band);
+      }
+      pinPos[n] = new THREE.Vector3(x, pico.y - 2.1, zL);
+    });
+  }
+  box(0.5, 0.5, 10.2, M(0x161616), -rowX, pico.y - 0.33, pico.cz);
+  box(0.5, 0.5, 10.2, M(0x161616), rowX, pico.y - 0.33, pico.cz);
+  // repère broche 1 (petit carré)
+  box(0.3, 0.02, 0.3, M(0xffffff), -rowX - 0.55, pico.y + 0.09, pinZ(1));
+
+  // ---------- Imprimante EM5820 (vue arrière) ----------
+  const pr = { x: 0, y: 4.5, z: -9, w: 12, h: 9, d: 9 };
+  box(pr.w, pr.h, pr.d, M(0x2b2f33, { roughness: 0.5 }), pr.x, pr.y, pr.z);
+  box(pr.w + 1.2, pr.h + 1.2, 0.4, M(0x3a3f44), pr.x, pr.y, pr.z - pr.d / 2 - 0.2);      // façade
+  const paper = new THREE.Mesh(new THREE.PlaneGeometry(5.8, 4), M(0xffffff, { side: THREE.DoubleSide }));
+  paper.position.set(0, pr.h + 1.6, pr.z - pr.d / 2 - 0.45); scene.add(paper);           // ticket qui sort
+  const rear = pr.z + pr.d / 2;
+  // Connecteur ALIM (2 broches)
+  box(1.6, 0.9, 0.6, M(0xf4f4f4), -4, 6, rear + 0.3);
+  // Connecteur TTL (5 broches)
+  box(2.6, 0.9, 0.6, M(0xf4f4f4), 0, 6, rear + 0.3);
+  // Connecteur RS232 (interdit)
+  box(3, 1.3, 0.5, M(0x9aa0a6, { metalness: 0.5, roughness: 0.35 }), 4, 6, rear + 0.25);
+  const red = M(0xd32f2f, { emissive: 0xd32f2f, emissiveIntensity: 0.4 });
+  [-1, 1].forEach(s => {
+    const bar = box(3.6, 0.22, 0.12, red, 4, 6, rear + 0.6);
+    bar.rotation.z = s * 0.38;
+  });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.1, 8, 40), red);
+  ring.position.set(4, 6, rear + 0.6); scene.add(ring);
+
+  const ttlPin = { GND: -0.8, RX: -0.4, TX: 0 };
+  const ttlP = k => new THREE.Vector3(ttlPin[k], 6, rear + 0.62);
+  const pwrP = k => new THREE.Vector3(k === 'VH' ? -4.35 : -3.65, 6, rear + 0.62);
+  for (let i = 0; i < 5; i++) box(0.18, 0.18, 0.1, gold, -0.8 + i * 0.4, 6, rear + 0.62);
+  box(0.18, 0.18, 0.1, gold, -4.35, 6, rear + 0.62);
+  box(0.18, 0.18, 0.1, gold, -3.65, 6, rear + 0.62);
+
+  // ---------- Adaptateur secteur ----------
+  box(3, 2, 4.5, M(0x1c1c1c), -11, 1, -1);
+  box(1.2, 1.4, 0.4, M(0xeeeeee), -11, 1.2, -3.45);  // prise
+  const adOut = new THREE.Vector3(-9.5, 1.5, -1);
+
+  // ---------- PC / chargeur ----------
+  box(6, 0.3, 4, M(0x6f767c, { metalness: 0.3 }), 16, 0.15, -1);
+  const screen = box(6, 3.8, 0.2, M(0x2a2e33), 16, 2.0, -3.1);
+  screen.rotation.x = -0.2;
+  const usbIn = new THREE.Vector3(13, 0.3, -0.3);
+
+  // ---------- Fils ----------
+  const groups = { power: [], data: [], usb: [], opt: [] };
+  function wire(points, color, group, radius) {
+    const curve = new THREE.CatmullRomCurve3(points);
+    const mat = M(color, { roughness: 0.45, transparent: true, opacity: 1 });
+    const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 80, radius || 0.11, 10, false), mat);
+    scene.add(mesh); groups[group].push(mesh);
+    return curve;
+  }
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+  wire([pinPos[1], V(-1.85, 0.2, 1.1), V(-3.6, 0.3, 0.6), V(-2.4, 3.5, -1.4), V(-0.5, 6, -3.2), ttlP('RX')], 0x2e9e4f, 'data');
+  wire([pinPos[3], V(-1.85, 0.2, 2.1), V(-4.4, 0.3, 1.6), V(-3.0, 3.8, -1.2), V(-0.9, 6, -3.2), ttlP('GND')], 0x222222, 'data');
+  wire([pinPos[2], V(-1.85, 0.2, 1.6), V(-4.0, 0.3, 1.1), V(-1.8, 4.2, -1.6), V(0, 6, -3.2), ttlP('TX')], 0xe3b505, 'opt');
+  wire([adOut, V(-8, 3.5, -1.6), V(-5.5, 5.5, -2.8), V(-4.4, 6, -3.3), pwrP('VH')], 0xd32f2f, 'power');
+  wire([adOut.clone().add(V(0, -0.4, 0.3)), V(-7.8, 3.1, -1.2), V(-5, 5.2, -2.6), V(-3.7, 6, -3.3), pwrP('GND')], 0x222222, 'power');
+  wire([V(0, pico.y + 0.38, pico.cz - pico.L / 2 - 0.25), V(0, 0.5, -0.4), V(3, 0.4, -0.6), V(7, 0.4, 0.8), V(11, 0.35, 0.2), usbIn], 0x8a8f8c, 'usb', 0.16);
+  // fil vers la prise murale
+  wire([V(-11, 1.2, -3.7), V(-12, 0.4, -5.5), V(-16, 0.3, -6)], 0x1c1c1c, 'power', 0.12);
+
+  // ---------- Étiquettes ----------
+  const labels = [];
+  function label(text, pos, opts) {
+    opts = opts || {};
+    const el = document.createElement('div');
+    el.className = 'lbl' + (opts.cls ? ' ' + opts.cls : '');
+    if (opts.dot) { const d = document.createElement('span'); d.className = 'dot'; d.style.background = opts.dot; el.appendChild(d); }
+    el.appendChild(document.createTextNode(text));
+    labelLayer.appendChild(el);
+    labels.push({ el, pos, group: opts.group || null });
+  }
+  function leader(from, to, group) {
+    const g = new THREE.BufferGeometry().setFromPoints([from, to]);
+    const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x777777, transparent: true }));
+    scene.add(l); if (group) groups[group].push(l);
+  }
+  // Broches Pico : étiquettes décalées vers la gauche avec un trait
+  [[1, 'GP0 · broche 1', '#2e9e4f', -2.4, 'data'], [2, 'GP1 · broche 2 (option)', '#e3b505', 1.0, 'opt'], [3, 'GND · broche 3', '#222', 4.4, 'data']]
+    .forEach(([n, t, c, dz, g]) => {
+      const a = V(-7.5, 1.2, pinZ(1) + dz);
+      leader(pinPos[n], a, g);
+      label(t, a, { dot: c, cls: 'mono', group: g });
+    });
+  label('Pico (agrandie) · broches mâles vers le bas', V(2.6, pico.y + 0.8, pico.cz + 1.5));
+  label('Fils femelles branchés SOUS la carte', V(-1.85, 0.0, pico.cz + 2.6), { group: 'data' });
+  label('Broche 1 (carré)', V(-rowX - 0.55, pico.y + 0.5, pinZ(1) - 0.6), { cls: 'mono' });
+  label('BOOTSEL', V(-0.9, pico.y + 0.6, pico.cz - 2.4), { cls: 'mono' });
+  label('Imprimante EM5820 · vue arrière', V(0, pr.h + 0.9, rear));
+  label('TTL ✓', V(0, 4.9, rear + 0.4), { cls: 'mono', dot: '#1f7a4d' });
+  label('RX', ttlP('RX').clone().add(V(0, 1.0, 0.2)), { cls: 'mono', group: 'data' });
+  label('GND', ttlP('GND').clone().add(V(-0.7, 1.0, 0.2)), { cls: 'mono', group: 'data' });
+  label('TX', ttlP('TX').clone().add(V(0.6, 1.0, 0.2)), { cls: 'mono', group: 'opt' });
+  label('RS232 ✕ NE PAS BRANCHER', V(4.5, 8.6, rear + 0.6), { cls: 'danger' });
+  label('ALIM : VH (+) / GND (−)', V(-4.5, 8.2, rear + 0.4), { cls: 'mono', dot: '#d32f2f', group: 'power' });
+  label('Adaptateur 5–9 V ≥ 2 A', V(-11, 2.6, -1), { group: 'power' });
+  label('Prise murale', V(-16, 0.7, -6), { group: 'power' });
+  label('PC (Thonny) ou chargeur USB 5 V', V(16, 4.6, -3.1), { group: 'usb' });
+  label('Câble USB data', V(7, 0.9, 0.8), { dot: '#8a8f8c', group: 'usb' });
+
+  // ---------- Étapes ----------
+  let step = 'all', showOpt = true;
+  function refresh() {
+    Object.entries(groups).forEach(([g, meshes]) => {
+      const visible = g !== 'opt' || showOpt;
+      const active = step === 'all' || g === step || (g === 'opt' && step === 'data');
+      meshes.forEach(m => { m.visible = visible; m.material.opacity = active ? 1 : 0.12; });
+    });
+    labels.forEach(l => {
+      const hidden = l.group === 'opt' && !showOpt;
+      const active = !l.group || step === 'all' || l.group === step || (l.group === 'opt' && step === 'data');
+      l.el.hidden = hidden;
+      l.el.classList.toggle('dim', !active);
+    });
+  }
+  const stepBtns = { all: 's-all', power: 's-power', data: 's-data', usb: 's-usb' };
+  Object.entries(stepBtns).forEach(([k, id]) => {
+    document.getElementById(id).addEventListener('click', () => {
+      step = k;
+      Object.values(stepBtns).forEach(b => document.getElementById(b).setAttribute('aria-pressed', String(b === id)));
+      refresh();
+    });
+  });
+  document.getElementById('opt').addEventListener('click', e => {
+    showOpt = !showOpt; e.currentTarget.setAttribute('aria-pressed', String(showOpt)); refresh();
+  });
+
+  // ---------- Vues caméra ----------
+  const views = {
+    '3d':    { p: V(14, 18, 26), t: V(0, 3, -1) },
+    'top':   { p: V(-1, 42, 2),  t: V(-1, 0, -1) },
+    'front': { p: V(-1, 7, 30),  t: V(-1, 4, -1) },
+    'pico':  { p: V(-13, 6, 16), t: V(-2, 1.5, 3) },
+    'under': { p: V(-1.5, -22, 5.6), t: V(-1.5, 2.4, 6) },
+  };
+  let anim = null;
+  function goTo(name) {
+    const v = views[name];
+    if (reduceMotion) { camera.position.copy(v.p); controls.target.copy(v.t); return; }
+    anim = { p0: camera.position.clone(), t0: controls.target.clone(), p1: v.p, t1: v.t, start: performance.now() };
+  }
+  document.getElementById('v-3d').addEventListener('click', () => goTo('3d'));
+  document.getElementById('v-top').addEventListener('click', () => goTo('top'));
+  document.getElementById('v-front').addEventListener('click', () => goTo('front'));
+  document.getElementById('v-pico').addEventListener('click', () => goTo('pico'));
+  document.getElementById('v-under').addEventListener('click', () => goTo('under'));
+  camera.position.copy(views['3d'].p); controls.target.copy(views['3d'].t);
+
+  // ---------- Rendu ----------
+  function resize() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.fov = w < 560 ? 52 : 40;
+    camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(canvas);
+  resize();
+
+  const tmp = new THREE.Vector3();
+  function placeLabels() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    labels.forEach(l => {
+      tmp.copy(l.pos).project(camera);
+      const off = tmp.z > 1 || tmp.x < -1.1 || tmp.x > 1.1 || tmp.y < -1.1 || tmp.y > 1.1;
+      l.el.style.visibility = off ? 'hidden' : 'visible';
+      l.el.style.left = ((tmp.x + 1) / 2 * w) + 'px';
+      l.el.style.top = ((1 - tmp.y) / 2 * h) + 'px';
+    });
+  }
+
+  function loop(now) {
+    if (anim) {
+      const k = Math.min(1, (now - anim.start) / 700);
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      camera.position.lerpVectors(anim.p0, anim.p1, e);
+      controls.target.lerpVectors(anim.t0, anim.t1, e);
+      if (k === 1) anim = null;
+    }
+    controls.update();
+    renderer.render(scene, camera);
+    placeLabels();
+    requestAnimationFrame(loop);
+  }
+  refresh();
+  requestAnimationFrame(loop);
+
+  // Suivre le thème du visualiseur
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+  new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+})();
+</script>
+
+</body></html>
